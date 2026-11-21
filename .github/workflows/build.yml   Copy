@@ -1,0 +1,46 @@
+name: Build BudgetBuddy on Windows
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Extract BudgetBuddy ZIP
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "BudgetBuddy_GitHub_Ready.zip" -DestinationPath "src" -Force
+
+      - name: Set up Visual Studio compiler
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build BudgetBuddy
+        shell: pwsh
+        run: |
+          msbuild "src/BudgetBuddy.sln" /t:Rebuild /p:Configuration=Release /p:Platform="Any CPU" /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build automated tests
+        shell: pwsh
+        run: |
+          msbuild "src/BudgetBuddy.Tests/BudgetBuddy.Tests.vbproj" /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run automated tests
+        shell: pwsh
+        run: |
+          & "src/BudgetBuddy.Tests/bin/Release/BudgetBuddyChecks.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save Windows application
+        uses: actions/upload-artifact@v4
+        with:
+          name: BudgetBuddy-Windows-App
+          path: src/BudgetBuddy/bin/Release/
+          if-no-files-found: error
